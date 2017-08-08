@@ -41,7 +41,7 @@ module ``7SegParser`` =
 
 
 // read a file and print the parsed seven-segment numbers
-"bank-ocr/sample" // file name
+"sample" // file name
 |> ``7SegParser``.readFileToDigits
 |> Seq.map ``7SegParser``.digitToInt
 |> Seq.iter (function
