@@ -5,112 +5,95 @@ open System.IO
 type OcrDigit = 
     | Digit of int * int array
     | Ambiguous of int array
+    with
+        override this.ToString(): string = 
+            match this with
+            | Digit(d, alternates) ->
+                d.ToString() + " [" + String.Join(",", alternates) + "]"
+            | Ambiguous(alternates) -> 
+                "[" + String.Join(",", alternates) + "]"
 
-let isDigit od = 
+let private isAmbiguous od = 
     match od with
-    | Digit(_) -> true
+    | Ambiguous(_) -> true
     | _ -> false
 
-let isUnambiguousDigit od = 
-    match od with
-    | Digit(_, [||]) -> true
-    | _ -> false
-
-let isAllUnambiguousDigits digits = 
-    digits
-    |> Array.forall isUnambiguousDigit
-
-let isIllegible od = 
-    match od with
-    | Ambiguous([||]) -> true
-    | _ -> false
-
-let getDigitVal od = 
+let private getDigitVal od = 
     match od with
     | Digit(dv, _) -> dv
     | _ -> failwith "not a digit"
 
-let getAlternates od = 
-    match od with
-    | Digit(_, alternates) -> alternates
-    | Ambiguous(alternates) -> alternates
+let private digitMap = 
+    let zeroStrings = 
+        (
+            " _ ",
+            "| |",
+            "|_|"
+        )
 
-let isAmbiguous od = 
-    match od with
-    | Ambiguous(possibilities) when possibilities.Length > 0 -> true
-    | _ -> false
+    let oneStrings = 
+        (
+            "   ",
+            "  |",
+            "  |"
+        )
 
-let private zeroStrings = 
-    (
-        " _ ",
-        "| |",
-        "|_|"
-    )
+    let twoStrings = 
+        (
+            " _ ",
+            " _|",
+            "|_ "
+        )
 
-let private oneStrings = 
-    (
-        "   ",
-        "  |",
-        "  |"
-    )
+    let threeStrings = 
+        (
+            " _ ",
+            " _|",
+            " _|"
+        )
 
-let private twoStrings = 
-    (
-        " _ ",
-        " _|",
-        "|_ "
-    )
+    let fourStrings = 
+        (
+            "   ",
+            "|_|",
+            "  |"
+        )
 
-let private threeStrings = 
-    (
-        " _ ",
-        " _|",
-        " _|"
-    )
+    let fiveStrings = 
+        (
+            " _ ",
+            "|_ ",
+            " _|"
+        )
 
-let private fourStrings = 
-    (
-        "   ",
-        "|_|",
-        "  |"
-    )
+    let sixStrings = 
+        (
+            " _ ",
+            "|_ ",
+            "|_|"
+        )
 
-let private fiveStrings = 
-    (
-        " _ ",
-        "|_ ",
-        " _|"
-    )
+    let sevenStrings = 
+        (
+            " _ ",
+            "  |",
+            "  |"
+        )
 
-let private sixStrings = 
-    (
-        " _ ",
-        "|_ ",
-        "|_|"
-    )
+    let eightStrings = 
+        (
+            " _ ",
+            "|_|",
+            "|_|"
+        )
 
-let private sevenStrings = 
-    (
-        " _ ",
-        "  |",
-        "  |"
-    )
+    let nineStrings = 
+        (
+            " _ ",
+            "|_|",
+            " _|"
+        )
 
-let private eightStrings = 
-    (
-        " _ ",
-        "|_|",
-        "|_|"
-    )
-
-let private nineStrings = 
-    (
-        " _ ",
-        "|_|",
-        " _|"
-    )
-
-let digitMap = 
     [|
         (zeroStrings, Digit (0, [||]))
         (oneStrings, Digit (1, [||]))
@@ -143,18 +126,23 @@ let isValidAccountInt(digits: int array) =
     | _ -> false
 
 let isValidAccount(digits: OcrDigit list) = 
-    let ints = 
-        digits
-        |> Array.ofList
-        |> Array.map(fun d -> 
-                        match d with 
-                        | Digit(e, [||]) -> e 
-                        | _ -> failwith "only use with definite digits")
-    isValidAccountInt(ints)
+    if (digits |> List.exists isAmbiguous) then
+        false
+    else
+        let ints = 
+            digits
+            |> Array.ofList
+            |> Array.map(fun d -> 
+                            match d with 
+                            | Digit(e, _) -> e 
+                            | _ -> failwith "only use with definite digits")
+        isValidAccountInt(ints)
 
 let rec digitGroupPossibilities(remaining: OcrDigit list): OcrDigit list seq = 
     seq {
         match remaining with
+        | [x] ->
+            yield [x]
         | x :: tail -> 
             let rest = digitGroupPossibilities(tail)
             let toPrepend = 
@@ -169,10 +157,15 @@ let rec digitGroupPossibilities(remaining: OcrDigit list): OcrDigit list seq =
     }
 
 let processDigitGroup(digits: OcrDigit array): ProcessedOutput = 
-    let possibilities = digitGroupPossibilities(digits |> List.ofArray)
+    let possibilities = 
+        digitGroupPossibilities(digits |> List.ofArray)
+//        |> Array.ofSeq
+
+//    System.Console.WriteLine(possibilities.Length.ToString() + " possibilities")
 
     match possibilities |> Seq.tryHead with
-    | Some(first) when isAllUnambiguousDigits(first |> Array.ofList) && isValidAccount(first) ->
+    | Some(first) when isValidAccount(first) ->
+        System.Console.WriteLine("unambiguous digits with valid checksum")
         // if there is an unambiguous reading with a correct checksum, prefer that.
         ValidOutput(first |> Array.ofList |> Array.map getDigitVal)
     | Some(_) -> 
@@ -183,12 +176,11 @@ let processDigitGroup(digits: OcrDigit array): ProcessedOutput =
         let valid = 
             possibilities
             |> Seq.filter isValidAccount
-            |> Array.ofSeq
 
-        match valid with
-        | [| onlyValid |] -> ValidOutput(onlyValid |> Array.ofList |> Array.map getDigitVal)
-        | [||] -> IllegibleOutput(digits)
-        | v -> AmbiguousOutput(digits, v |> Array.map Array.ofList)
+        match valid |> Seq.tryHead with
+        | Some(onlyValid) when valid |> Seq.tail |> Seq.isEmpty -> ValidOutput(onlyValid |> Array.ofList |> Array.map getDigitVal)
+        | Some(_) -> AmbiguousOutput(digits, valid |> Array.ofSeq |> Array.map Array.ofList)
+        | None -> IllegibleOutput(digits)
         
     | _ -> IllegibleOutput(digits)
 
@@ -206,7 +198,7 @@ let outputProcessedGunk(o: ProcessedOutput) =
         Console.Write(String.Join("", original |> Array.map ocrDigitToString))
         Console.Write(" AMB [")
         let possibilityStrings = 
-            String.Join(", ", possibilities |> Array.collect (fun ps -> ps |> Array.map ocrDigitToString))
+            String.Join(", ", possibilities |> Array.map (fun ps -> String.Join("", ps |> Array.map ocrDigitToString)))
 
         Console.Write(possibilityStrings)
         Console.WriteLine("]")
@@ -257,14 +249,16 @@ let digitBoxForGroup(group: string array) =
             |> Array.map(fun db -> digitMap |> Map.tryFind(db))
             |> Array.filter(fun digitOpt -> digitOpt.IsSome)
             |> Array.map(fun digitOpt -> digitOpt.Value)
+            |> Array.map getDigitVal
 
         match digitMap |> Map.tryFind(db) with
         | Some(Digit(digitVal, _)) -> 
-            Digit(digitVal, alternateDigits |> Array.map getDigitVal)
-        | _ -> 
-            Ambiguous(alternateDigits |> Array.map getDigitVal)
+            System.Console.WriteLine("found unambiguous digit " + digitVal.ToString())
+            Digit(digitVal, alternateDigits |> Array.filter(fun d -> d <> digitVal))
+        | _ -> Ambiguous(alternateDigits)
 
-    digitBoxesForChunk(group) |> Array.map digitBoxForTuple
+    digitBoxesForChunk(group) 
+    |> Array.map digitBoxForTuple
 
 let readFile(fileName: string) = 
     let allText = File.ReadAllText(fileName)
@@ -280,4 +274,5 @@ let readFile(fileName: string) =
     |> Array.map(digitBoxForGroup >> processDigitGroup)
     |> Array.iter outputProcessedGunk
     
-readFile(@"sample")
+let runKata() = 
+    readFile(@"c:\projects\codingbreakfast\katas\bank-ocr\sample2")
