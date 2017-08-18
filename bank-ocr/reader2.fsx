@@ -185,8 +185,9 @@ let processDigitGroup(digits: OcrDigit array): ProcessedOutput =
         
     | _ -> IllegibleOutput(digits)
 
-let ocrDigitToString(d: OcrDigit) = 
+let ocrDigitToString(printDigitForAmbiguous: bool)(d: OcrDigit) = 
     match d with
+    | Digit(d, _) when printDigitForAmbiguous -> d.ToString()
     | Digit(d, [||]) -> d.ToString()
     | _ -> "?"
 
@@ -196,15 +197,15 @@ let outputProcessedGunk(o: ProcessedOutput) =
         ds |> Array.iter Console.Write
         Console.WriteLine()
     | AmbiguousOutput(original, possibilities) -> 
-        Console.Write(String.Join("", original |> Array.map ocrDigitToString))
+        Console.Write(String.Join("", original |> Array.map(ocrDigitToString(true))))
         Console.Write(" AMB [")
         let possibilityStrings = 
-            String.Join(", ", possibilities |> Array.map (fun ps -> String.Join("", ps |> Array.map ocrDigitToString)))
+            String.Join(", ", possibilities |> Array.map (fun ps -> String.Join("", ps |> Array.map(ocrDigitToString(false)))))
 
         Console.Write(possibilityStrings)
         Console.WriteLine("]")
     | IllegibleOutput(original) ->
-        Console.Write(String.Join("", original |> Array.map ocrDigitToString))
+        Console.Write(String.Join("", original |> Array.map(ocrDigitToString(false))))
         Console.WriteLine(" ILL")
     
 /////////////////////////////////////////////////////////////////////////////
