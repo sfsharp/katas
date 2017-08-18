@@ -142,7 +142,12 @@ let rec digitGroupPossibilities(remaining: OcrDigit list): OcrDigit list seq =
     seq {
         match remaining with
         | [x] ->
-            yield [x]
+            match x with
+            | Digit(d, others) ->
+                yield [Digit(d, [||])]
+                yield! others |> Array.map(fun newdigit -> [Digit(newdigit, [||])])
+            | Ambiguous(others) ->
+                yield! others |> Array.map(fun newdigit -> [Digit(newdigit, [||])])
         | x :: tail -> 
             let rest = digitGroupPossibilities(tail)
             let toPrepend = 
@@ -159,13 +164,9 @@ let rec digitGroupPossibilities(remaining: OcrDigit list): OcrDigit list seq =
 let processDigitGroup(digits: OcrDigit array): ProcessedOutput = 
     let possibilities = 
         digitGroupPossibilities(digits |> List.ofArray)
-//        |> Array.ofSeq
-
-//    System.Console.WriteLine(possibilities.Length.ToString() + " possibilities")
 
     match possibilities |> Seq.tryHead with
     | Some(first) when isValidAccount(first) ->
-        System.Console.WriteLine("unambiguous digits with valid checksum")
         // if there is an unambiguous reading with a correct checksum, prefer that.
         ValidOutput(first |> Array.ofList |> Array.map getDigitVal)
     | Some(_) -> 
@@ -223,6 +224,7 @@ let digitBoxForGroup(group: string array) =
 
         let alternates = 
             [|
+                // add pipe
                 (one.Remove(0, 1).Insert(0, "|"), two, three)
                 (one.Remove(1, 1).Insert(1, "|"), two, three)
                 (one.Remove(2, 1).Insert(2, "|"), two, three)
@@ -233,6 +235,7 @@ let digitBoxForGroup(group: string array) =
                 (one, two, three.Remove(1, 1).Insert(1, "|"))
                 (one, two, three.Remove(2, 1).Insert(2, "|"))
 
+                // add underscore
                 (one.Remove(0, 1).Insert(0, "_"), two, three)
                 (one.Remove(1, 1).Insert(1, "_"), two, three)
                 (one.Remove(2, 1).Insert(2, "_"), two, three)
@@ -242,6 +245,17 @@ let digitBoxForGroup(group: string array) =
                 (one, two, three.Remove(0, 1).Insert(0, "_"))
                 (one, two, three.Remove(1, 1).Insert(1, "_"))
                 (one, two, three.Remove(2, 1).Insert(2, "_"))
+
+                // remove contents
+                (one.Remove(0, 1).Insert(0, " "), two, three)
+                (one.Remove(1, 1).Insert(1, " "), two, three)
+                (one.Remove(2, 1).Insert(2, " "), two, three)
+                (one, two.Remove(0, 1).Insert(0, " "), three)
+                (one, two.Remove(1, 1).Insert(1, " "), three)
+                (one, two.Remove(2, 1).Insert(2, " "), three)
+                (one, two, three.Remove(0, 1).Insert(0, " "))
+                (one, two, three.Remove(1, 1).Insert(1, " "))
+                (one, two, three.Remove(2, 1).Insert(2, " "))
             |]
 
         let alternateDigits = 
@@ -253,7 +267,6 @@ let digitBoxForGroup(group: string array) =
 
         match digitMap |> Map.tryFind(db) with
         | Some(Digit(digitVal, _)) -> 
-            System.Console.WriteLine("found unambiguous digit " + digitVal.ToString())
             Digit(digitVal, alternateDigits |> Array.filter(fun d -> d <> digitVal))
         | _ -> Ambiguous(alternateDigits)
 
@@ -274,5 +287,5 @@ let readFile(fileName: string) =
     |> Array.map(digitBoxForGroup >> processDigitGroup)
     |> Array.iter outputProcessedGunk
     
-let runKata() = 
-    readFile(@"c:\projects\codingbreakfast\katas\bank-ocr\sample2")
+let runKata(fileName: string) = 
+    readFile(@"c:\projects\codingbreakfast\katas\bank-ocr\" + fileName)
