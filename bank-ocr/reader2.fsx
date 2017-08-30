@@ -1,3 +1,6 @@
+// BankOCR Kata (from http://codingdojo.org/kata/BankOCR/ )
+// by Erik Novales (enovales@codehitmen.com)
+
 open System
 open System.IO
 
