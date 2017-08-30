@@ -2,14 +2,21 @@ open System
 open System.IO
 
 // sketch:
-// 1) DU of read digits (valid/invalid)
-// 2) seq beginning with input, and then all permutations
-// 3)   run through pipeline of generating digits, and then checking checksum
-// 4) if seq head is valid, then use that.
-// 5) if not, then count the number of valid entries in the whole sequence.
-//      if only 1, then use that.
-//      if >1, then ambiguous (print all).
-//      if 0, then illegible.
+// 1) Create a discriminated union of OCR digits (valid/invalid)
+// 2) For each line group, check to see if the digits that are read satisfy the
+//    checksum.
+// 3) If so, then output the digits.
+// 4) If not, generate all single-error permutations.
+// 5) If there is exactly one single-error permutation that is valid, then
+//    output that.
+// 6) If there is more than one single-error permutation that has a valid
+//    checksum, then output the original digits, marked as ambiguous, and then
+//    all valid possibilities.
+// 7) If there are no valid single-error permutations, then output the original
+//    digits, marked as illegible.
+
+/////////////////////////////////////////////////////////////////////////////
+// OcrBox discriminated union and utilities
 
 type OcrBox = 
   | Digit of int
@@ -117,7 +124,10 @@ let private digitMap =
     |]
     |> Map.ofArray
 
+/////////////////////////////////////////////////////////////////////////////
 
+
+// Returns a sequence of all single-error permutations for the input string.
 let permuteString(s: string) = 
     let chars = s.ToCharArray()
     seq {
@@ -131,6 +141,7 @@ let permuteString(s: string) =
                     yield new String(newVal)
     }
 
+// Returns an array of OCR digits for a group of lines.
 let digitsForLineGroup(lineGroup: string array): OcrBox array = 
     let digitForLineGroup(boxTuple: char array * char array * char array) = 
         match digitMap.TryFind(boxTuple) with
@@ -147,6 +158,7 @@ let digitsForLineGroup(lineGroup: string array): OcrBox array =
         |> Array.map digitForLineGroup
     | _ -> failwith "need to use 3-length line group"
 
+// Returns whether the checksum for a given set of digits is valid.
 let isValidAccountInt(digits: int array) = 
     match digits with
     | [| d9; d8; d7; d6; d5; d4; d3; d2; d1 |] ->
@@ -154,6 +166,7 @@ let isValidAccountInt(digits: int array) =
         sum % 11 = 0
     | _ -> false
 
+// Returns whether a set of OCR digits represents a value with a valid checksum.
 let isValidAccount(digits: OcrBox array) = 
     let digitInts = getDigits(digits)
     if (digitInts.Length <> 9) then
@@ -161,18 +174,8 @@ let isValidAccount(digits: OcrBox array) =
     else
         isValidAccountInt(digitInts)
 
+// Runs the kata. Takes the filename of the input file as a parameter.
 let runKata(fileName: string) = 
-    let getSeqForLineGroup(lines: string array) = 
-        seq {
-            yield digitsForLineGroup(lines)
-
-            let joined = String.Join(Environment.NewLine, lines)
-            yield! 
-                permuteString(joined)
-                |> Seq.map(fun s -> s.Split([| Environment.NewLine |], StringSplitOptions.None))
-                |> Seq.map(fun j -> digitsForLineGroup(j))
-        }
-
     let lineGroups = 
         File.ReadAllLines(fileName)
         |> Array.chunkBySize(3)
@@ -185,8 +188,7 @@ let runKata(fileName: string) =
         let originalDigitBoxes = digitsForLineGroup(original.Split([| Environment.NewLine |], StringSplitOptions.None))
         let permutationDigitBoxes = 
             permutations 
-            |> Seq.map(fun s -> s.Split([| Environment.NewLine |], StringSplitOptions.None))
-            |> Seq.map digitsForLineGroup
+            |> Seq.map((fun s -> s.Split([| Environment.NewLine |], StringSplitOptions.None)) >> digitsForLineGroup)
 
         if isValidAccount(originalDigitBoxes) then
             System.Console.WriteLine(digitsToString(originalDigitBoxes))
@@ -207,4 +209,3 @@ let runKata(fileName: string) =
     lineGroups
     |> Array.iter runKataForLineGroup
 
-    

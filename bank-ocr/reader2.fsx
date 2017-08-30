@@ -1,6 +1,26 @@
 open System
 open System.IO
 
+// This program actually solves a slightly different problem than the one
+// specified in the BankOCR kata. Instead of only allowing a single OCR
+// mistake in a digit group, this one solves for an OCR mistake in each
+// digit.
+//
+// Sketch:
+// 1) Define a discriminated union for the OCR digits. The discriminated union
+//    values can contain an exact match (for Digit) as well as alternate
+//    possibilities, taking into account a single OCR mistake per digit.
+// 2) Read in the input, split into line groups, and generate digits.
+// 3) Check to see if the digits that are read satisfy the checksum.
+// 4) If so, then output the digits.
+// 5) If not, then generate all possibilities of digit sequences (based on
+//    single-character errors in each digit).
+// 6) If there is exactly one permutation that is valid, then output that.
+// 7) If there is more than one permutation that has a valid checksum, then 
+//    output the original digits, marked as ambiguous, and then all valid 
+//    possibilities.
+// 8) If there are no valid permutations, then output the original digits, 
+//    marked as illegible.
 /////////////////////////////////////////////////////////////////////////////
 type OcrDigit = 
     | Digit of int * int array
@@ -289,4 +309,4 @@ let readFile(fileName: string) =
     |> Array.iter outputProcessedGunk
     
 let runKata(fileName: string) = 
-    readFile(@"c:\projects\codingbreakfast\katas\bank-ocr\" + fileName)
+    readFile(fileName)
