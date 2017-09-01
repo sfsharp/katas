@@ -177,6 +177,9 @@ let isValidAccount(digits: OcrBox array) =
     else
         isValidAccountInt(digitInts)
 
+let splitLines(s: string) = 
+    s.Split([| Environment.NewLine |], StringSplitOptions.None)
+
 // Runs the kata. Takes the filename of the input file as a parameter.
 let runKata(fileName: string) = 
     let lineGroups = 
@@ -186,29 +189,26 @@ let runKata(fileName: string) =
         |> Array.map(fun g -> String.Join(Environment.NewLine, g))
 
     let runKataForLineGroup(original: string) = 
-        let permutations = permuteString(original)
-
-        let originalDigitBoxes = digitsForLineGroup(original.Split([| Environment.NewLine |], StringSplitOptions.None))
-        let permutationDigitBoxes = 
-            permutations 
-            |> Seq.map((fun s -> s.Split([| Environment.NewLine |], StringSplitOptions.None)) >> digitsForLineGroup)
-
+        let originalDigitBoxes = digitsForLineGroup(splitLines(original))
         if isValidAccount(originalDigitBoxes) then
             System.Console.WriteLine(digitsToString(originalDigitBoxes))
         else
-            let validNumbers = permutationDigitBoxes |> Seq.filter isValidAccount
-            match validNumbers |> Seq.length with
+            let validPermutations = 
+                permuteString(original)
+                |> Seq.map (splitLines >> digitsForLineGroup)
+                |> Seq.filter isValidAccount
+
+            match validPermutations |> Seq.length with
             | 1 ->
-                System.Console.WriteLine(digitsToString(validNumbers |> Seq.head))
+                System.Console.WriteLine(digitsToString(validPermutations |> Seq.head))
             | 0 ->
                 System.Console.Write(digitsToString(originalDigitBoxes))
                 System.Console.WriteLine(" ILL")
             | _ -> 
                 System.Console.Write(digitsToString(originalDigitBoxes))
                 System.Console.Write(" AMB [")
-                System.Console.Write(String.Join(", ", validNumbers |> Seq.map digitsToString))
+                System.Console.Write(String.Join(", ", validPermutations |> Seq.map digitsToString))
                 System.Console.WriteLine("]")
 
     lineGroups
     |> Array.iter runKataForLineGroup
-
