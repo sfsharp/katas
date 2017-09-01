@@ -138,10 +138,13 @@ let permuteString(s: string) =
             for i in 0..chars.Length - 1 do
                 match chars.[i] with
                 | '\r' | '\n' -> ()
-                | _ -> 
+                | n when c <> n -> 
+                    // Only emit a permutation if the character will actually
+                    // be different.
                     let newVal = Array.copy(chars)
                     newVal.[i] <- c
                     yield new String(newVal)
+                | _ -> ()
     }
 
 // Returns an array of OCR digits for a group of lines.
